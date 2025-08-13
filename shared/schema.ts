@@ -33,6 +33,9 @@ export const issues = pgTable("issues", {
 export const insertScanSchema = createInsertSchema(scans).omit({
   id: true,
   createdAt: true,
+  completedAt: true,
+  progress: true,
+  currentStep: true,
 });
 
 export const insertIssueSchema = createInsertSchema(issues).omit({
@@ -43,6 +46,9 @@ export type InsertScan = z.infer<typeof insertScanSchema>;
 export type Scan = typeof scans.$inferSelect;
 export type InsertIssue = z.infer<typeof insertIssueSchema>;
 export type Issue = typeof issues.$inferSelect;
+
+// Extended types for API responses
+export type ScanWithIssues = Scan & { issues: Issue[] };
 
 export const scanOptionsSchema = z.object({
   eslint: z.boolean().default(true),

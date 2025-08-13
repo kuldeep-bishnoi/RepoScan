@@ -5,12 +5,13 @@ import ScanForm from "@/components/scan-form";
 import ScanProgress from "@/components/scan-progress";
 import ScanResults from "@/components/scan-results";
 import { useQuery } from "@tanstack/react-query";
+import type { ScanWithIssues } from "@shared/schema";
 
 export default function Dashboard() {
   const { id: scanId } = useParams<{ id?: string }>();
   const [activeScanId, setActiveScanId] = useState<string | null>(scanId || null);
 
-  const { data: activeScan } = useQuery({
+  const { data: activeScan } = useQuery<ScanWithIssues>({
     queryKey: ["/api/scans", activeScanId],
     enabled: !!activeScanId,
   });

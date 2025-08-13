@@ -28,6 +28,7 @@ export class MemStorage implements IStorage {
     const scan: Scan = {
       ...insertScan,
       id,
+      status: insertScan.status || "pending",
       createdAt: new Date(),
       completedAt: null,
       progress: 0,
@@ -58,7 +59,16 @@ export class MemStorage implements IStorage {
 
   async createIssue(insertIssue: InsertIssue): Promise<Issue> {
     const id = randomUUID();
-    const issue: Issue = { ...insertIssue, id };
+    const issue: Issue = { 
+      ...insertIssue, 
+      id,
+      line: insertIssue.line ?? null,
+      column: insertIssue.column ?? null,
+      file: insertIssue.file ?? null,
+      rule: insertIssue.rule ?? null,
+      remediation: insertIssue.remediation ?? null,
+      cve: insertIssue.cve ?? null,
+    };
     this.issues.set(id, issue);
     return issue;
   }
@@ -74,10 +84,11 @@ export class MemStorage implements IStorage {
   }
 
   async deleteIssuesByScan(scanId: string): Promise<void> {
-    for (const [id, issue] of this.issues.entries()) {
-      if (issue.scanId === scanId) {
-        this.issues.delete(id);
-      }
+    const entriesToDelete = Array.from(this.issues.entries())
+      .filter(([, issue]) => issue.scanId === scanId);
+    
+    for (const [id] of entriesToDelete) {
+      this.issues.delete(id);
     }
   }
 }

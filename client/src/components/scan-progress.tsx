@@ -3,6 +3,12 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Card, CardContent } from "@/components/ui/card";
 
+type ProgressData = {
+  status: string;
+  progress: number;
+  currentStep: string | null;
+};
+
 interface ScanProgressProps {
   scanId: string;
   repositoryName: string;
@@ -10,15 +16,15 @@ interface ScanProgressProps {
 }
 
 export default function ScanProgress({ scanId, repositoryName, onComplete }: ScanProgressProps) {
-  const { data: progressData } = useQuery({
+  const { data: progressData } = useQuery<ProgressData>({
     queryKey: ["/api/scans", scanId, "progress"],
     refetchInterval: 1000, // Poll every second
-    onSuccess: (data) => {
-      if (data?.status === 'completed') {
-        onComplete();
-      }
-    },
   });
+
+  // Check if scan is completed and call onComplete
+  if (progressData?.status === 'completed') {
+    onComplete();
+  }
 
   const progress = progressData?.progress || 0;
   const currentStep = progressData?.currentStep || "Initializing...";

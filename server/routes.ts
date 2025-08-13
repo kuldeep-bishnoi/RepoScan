@@ -43,9 +43,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Create new scan
   app.post("/api/scans", async (req, res) => {
     try {
-      const body = insertScanSchema.extend({
+      const requestSchema = z.object({
+        repositoryUrl: z.string().url(),
         scanOptions: scanOptionsSchema,
-      }).parse(req.body);
+      });
+      
+      const body = requestSchema.parse(req.body);
 
       // Validate GitHub URL
       const repository = await githubService.validateAndParseUrl(body.repositoryUrl);

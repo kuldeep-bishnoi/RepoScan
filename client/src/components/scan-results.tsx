@@ -2,14 +2,14 @@ import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import IssueList from "./issue-list";
-import type { Issue } from "@shared/schema";
+import type { Issue, ScanWithIssues } from "@shared/schema";
 
 interface ScanResultsProps {
   scanId: string;
 }
 
 export default function ScanResults({ scanId }: ScanResultsProps) {
-  const { data: scanData, isLoading } = useQuery({
+  const { data: scanData, isLoading } = useQuery<ScanWithIssues>({
     queryKey: ["/api/scans", scanId],
   });
 
