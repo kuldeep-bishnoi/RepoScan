@@ -1,7 +1,8 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Card, CardContent } from "@/components/ui/card";
+import { useEffect } from "react";
 
 type ProgressData = {
   status: string;
@@ -16,15 +17,27 @@ interface ScanProgressProps {
 }
 
 export default function ScanProgress({ scanId, repositoryName, onComplete }: ScanProgressProps) {
+  const queryClient = useQueryClient();
   const { data: progressData } = useQuery<ProgressData>({
     queryKey: ["/api/scans", scanId, "progress"],
-    refetchInterval: 1000, // Poll every second
+    refetchInterval: (data) => {
+      // Stop polling if scan is completed
+      if (data?.status === 'completed' || data?.status === 'failed') {
+        return false;
+      }
+      return 1000; // Poll every second while scanning
+    },
   });
 
-  // Check if scan is completed and call onComplete
-  if (progressData?.status === 'completed') {
-    onComplete();
-  }
+  // Use useEffect to handle completion properly
+  useEffect(() => {
+    if (progressData?.status === 'completed') {
+      // Invalidate the scan query to refresh the main scan data
+      queryClient.invalidateQueries({ queryKey: ["/api/scans", scanId] });
+      // Call onComplete callback
+      onComplete();
+    }
+  }, [progressData?.status, queryClient, scanId, onComplete]);
 
   const progress = progressData?.progress || 0;
   const currentStep = progressData?.currentStep || "Initializing...";
