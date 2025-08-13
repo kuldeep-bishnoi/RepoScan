@@ -25,7 +25,7 @@ export const issues = pgTable("issues", {
   line: integer("line"),
   column: integer("column"),
   rule: text("rule"),
-  source: text("source").notNull(), // eslint, npm-audit, security-patterns
+  source: text("source").notNull(), // eslint, npm-audit, security-patterns, semgrep, trivy
   remediation: text("remediation"),
   cve: text("cve"),
 });
@@ -54,6 +54,8 @@ export const scanOptionsSchema = z.object({
   eslint: z.boolean().default(true),
   npmAudit: z.boolean().default(true),
   securityPatterns: z.boolean().default(true),
+  semgrep: z.boolean().default(true),
+  trivy: z.boolean().default(true),
   deepAnalysis: z.boolean().default(false),
 });
 

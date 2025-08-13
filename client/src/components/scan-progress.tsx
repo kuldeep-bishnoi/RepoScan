@@ -20,9 +20,9 @@ export default function ScanProgress({ scanId, repositoryName, onComplete }: Sca
   const queryClient = useQueryClient();
   const { data: progressData } = useQuery<ProgressData>({
     queryKey: ["/api/scans", scanId, "progress"],
-    refetchInterval: (data) => {
+    refetchInterval: (query) => {
       // Stop polling if scan is completed
-      if (data?.status === 'completed' || data?.status === 'failed') {
+      if (query.state.data?.status === 'completed' || query.state.data?.status === 'failed') {
         return false;
       }
       return 1000; // Poll every second while scanning
@@ -52,9 +52,11 @@ export default function ScanProgress({ scanId, repositoryName, onComplete }: Sca
 
   const steps = [
     { name: "Repository cloned successfully", completed: progress > 10 },
-    { name: "Running ESLint analysis...", completed: progress > 25, active: progress >= 25 && progress < 50 },
-    { name: "npm audit scan", completed: progress > 50, active: progress >= 50 && progress < 75 },
-    { name: "Security pattern analysis", completed: progress > 75, active: progress >= 75 && progress < 100 },
+    { name: "ESLint analysis", completed: progress > 25, active: progress >= 25 && progress < 50 },
+    { name: "npm audit scan", completed: progress > 50, active: progress >= 50 && progress < 60 },
+    { name: "Security pattern analysis", completed: progress > 60, active: progress >= 60 && progress < 75 },
+    { name: "Semgrep analysis", completed: progress > 75, active: progress >= 75 && progress < 85 },
+    { name: "Trivy security scan", completed: progress > 85, active: progress >= 85 && progress < 95 },
   ];
 
   return (

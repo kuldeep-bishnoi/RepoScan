@@ -65,6 +65,10 @@ export default function IssueList({ issues }: IssueListProps) {
         return "npm audit";
       case "security-patterns":
         return "Security Pattern";
+      case "semgrep":
+        return "Semgrep";
+      case "trivy":
+        return "Trivy";
       default:
         return source;
     }

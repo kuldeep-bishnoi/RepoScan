@@ -39,13 +39,25 @@ export class ScannerService {
       }
 
       if (options.securityPatterns) {
-        onProgress?.("Analyzing security patterns...", 75);
+        onProgress?.("Analyzing security patterns...", 60);
         const securityIssues = await this.analyzeSecurityPatterns(directory);
         issues.push(...securityIssues);
       }
 
+      if (options.semgrep) {
+        onProgress?.("Running Semgrep analysis...", 75);
+        const semgrepIssues = await this.runSemgrep(directory);
+        issues.push(...semgrepIssues);
+      }
+
+      if (options.trivy) {
+        onProgress?.("Running Trivy security scan...", 85);
+        const trivyIssues = await this.runTrivy(directory);
+        issues.push(...trivyIssues);
+      }
+
       if (options.deepAnalysis) {
-        onProgress?.("Running deep analysis...", 90);
+        onProgress?.("Running deep analysis...", 95);
         const deepIssues = await this.runDeepAnalysis(directory);
         issues.push(...deepIssues);
       }
@@ -220,9 +232,108 @@ export class ScannerService {
     }
   }
 
+  private async runSemgrep(directory: string): Promise<Omit<Issue, 'id' | 'scanId'>[]> {
+    try {
+      // Try to run Semgrep with auto config (covers many languages and security patterns)
+      const { stdout } = await execAsync(`semgrep --config=auto --json "${directory}"`, {
+        timeout: 120000, // 2 minute timeout
+      }).catch(error => {
+        // Semgrep exits with non-zero code when findings are present
+        return { stdout: error.stdout || '[]' };
+      });
+
+      const results = JSON.parse(stdout || '[]');
+      const issues: Omit<Issue, 'id' | 'scanId'>[] = [];
+
+      if (results.results) {
+        for (const result of results.results) {
+          const severity = this.mapSemgrepSeverity(result.extra?.severity || 'INFO');
+          
+          issues.push({
+            severity,
+            title: result.extra?.message || result.check_id,
+            description: `Semgrep finding: ${result.extra?.message || 'Security issue detected'}`,
+            file: result.path.replace(directory, ''),
+            line: result.start?.line || null,
+            column: result.start?.col || null,
+            rule: result.check_id,
+            source: 'semgrep',
+            remediation: result.extra?.fix_regex ? 'Apply suggested fix' : 'Review and remediate based on rule documentation',
+            cve: null,
+          });
+        }
+      }
+
+      return issues;
+    } catch (error) {
+      console.warn('Semgrep analysis failed:', error);
+      return [];
+    }
+  }
+
+  private async runTrivy(directory: string): Promise<Omit<Issue, 'id' | 'scanId'>[]> {
+    try {
+      // Run Trivy filesystem scan for vulnerabilities and misconfigurations
+      const trivyPath = '/home/runner/workspace/trivy';
+      const { stdout } = await execAsync(`${trivyPath} fs --format json --quiet "${directory}"`, {
+        timeout: 180000, // 3 minute timeout
+      }).catch(error => {
+        return { stdout: error.stdout || '{"Results": []}' };
+      });
+
+      const results = JSON.parse(stdout || '{"Results": []}');
+      const issues: Omit<Issue, 'id' | 'scanId'>[] = [];
+
+      if (results.Results) {
+        for (const result of results.Results) {
+          // Process vulnerabilities
+          if (result.Vulnerabilities) {
+            for (const vuln of result.Vulnerabilities) {
+              issues.push({
+                severity: this.mapTrivySeverity(vuln.Severity),
+                title: `${vuln.PkgName}: ${vuln.VulnerabilityID}`,
+                description: vuln.Description || `Vulnerability in ${vuln.PkgName}`,
+                file: result.Target,
+                line: null,
+                column: null,
+                rule: vuln.VulnerabilityID,
+                source: 'trivy',
+                remediation: vuln.FixedVersion ? `Update to version ${vuln.FixedVersion}` : 'Update to a patched version',
+                cve: vuln.VulnerabilityID.startsWith('CVE-') ? vuln.VulnerabilityID : null,
+              });
+            }
+          }
+
+          // Process misconfigurations
+          if (result.Misconfigurations) {
+            for (const misconfig of result.Misconfigurations) {
+              issues.push({
+                severity: this.mapTrivySeverity(misconfig.Severity),
+                title: misconfig.Title,
+                description: misconfig.Description,
+                file: result.Target,
+                line: misconfig.CauseMetadata?.StartLine || null,
+                column: null,
+                rule: misconfig.ID,
+                source: 'trivy',
+                remediation: misconfig.Resolution || 'Fix configuration issue',
+                cve: null,
+              });
+            }
+          }
+        }
+      }
+
+      return issues;
+    } catch (error) {
+      console.warn('Trivy analysis failed:', error);
+      return [];
+    }
+  }
+
   private async runDeepAnalysis(directory: string): Promise<Omit<Issue, 'id' | 'scanId'>[]> {
-    // Placeholder for deep analysis - could integrate with tools like Semgrep, CodeQL, etc.
-    // For now, return empty array
+    // Placeholder for additional deep analysis tools
+    // Could integrate with CodeQL, Bandit for Python, etc.
     return [];
   }
 
@@ -248,6 +359,36 @@ export class ScannerService {
         return 'medium';
       case 'low':
       case 'info':
+      default:
+        return 'low';
+    }
+  }
+
+  private mapSemgrepSeverity(semgrepSeverity: string): 'high' | 'medium' | 'low' {
+    switch (semgrepSeverity?.toUpperCase()) {
+      case 'ERROR':
+      case 'HIGH':
+        return 'high';
+      case 'WARNING':
+      case 'MEDIUM':
+        return 'medium';
+      case 'INFO':
+      case 'LOW':
+      default:
+        return 'low';
+    }
+  }
+
+  private mapTrivySeverity(trivySeverity: string): 'high' | 'medium' | 'low' {
+    switch (trivySeverity?.toUpperCase()) {
+      case 'CRITICAL':
+      case 'HIGH':
+        return 'high';
+      case 'MEDIUM':
+        return 'medium';
+      case 'LOW':
+      case 'UNKNOWN':
+      case 'NEGLIGIBLE':
       default:
         return 'low';
     }

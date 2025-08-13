@@ -18,6 +18,8 @@ export default function ScanForm({ onScanStarted, disabled = false }: ScanFormPr
     eslint: true,
     npmAudit: true,
     securityPatterns: true,
+    semgrep: true,
+    trivy: true,
     deepAnalysis: false,
   });
 
@@ -150,6 +152,26 @@ export default function ScanForm({ onScanStarted, disabled = false }: ScanFormPr
               disabled={disabled}
             />
             <Label htmlFor="security-patterns" className="text-sm text-slate-700">Security Patterns</Label>
+          </div>
+          
+          <div className="flex items-center space-x-2">
+            <Checkbox 
+              id="semgrep"
+              checked={scanOptions.semgrep}
+              onCheckedChange={handleOptionChange('semgrep')}
+              disabled={disabled}
+            />
+            <Label htmlFor="semgrep" className="text-sm text-slate-700">Semgrep</Label>
+          </div>
+          
+          <div className="flex items-center space-x-2">
+            <Checkbox 
+              id="trivy"
+              checked={scanOptions.trivy}
+              onCheckedChange={handleOptionChange('trivy')}
+              disabled={disabled}
+            />
+            <Label htmlFor="trivy" className="text-sm text-slate-700">Trivy</Label>
           </div>
           
           <div className="flex items-center space-x-2">
