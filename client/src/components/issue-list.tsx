@@ -69,6 +69,12 @@ export default function IssueList({ issues }: IssueListProps) {
         return "Semgrep";
       case "trivy":
         return "Trivy";
+      case "secret-scan":
+        return "Secret Scan";
+      case "bandit":
+        return "Bandit";
+      case "safety":
+        return "Safety";
       default:
         return source;
     }

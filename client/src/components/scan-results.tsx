@@ -139,45 +139,69 @@ export default function ScanResults({ scanId }: ScanResultsProps) {
           </div>
 
           {/* Scan Tools Summary */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-            <div className="bg-slate-50 rounded-lg p-4">
-              <div className="flex items-center justify-between mb-2">
-                <h4 className="font-medium text-slate-900">ESLint</h4>
-                <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full">✓</span>
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3">
+            <div className="bg-slate-50 rounded-lg p-3">
+              <div className="flex items-center justify-between mb-1">
+                <h4 className="font-medium text-slate-900 text-sm">ESLint</h4>
+                <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded">✓</span>
               </div>
-              <p className="text-sm text-slate-600">{issues.filter(i => i.source === 'eslint').length} issues</p>
+              <p className="text-xs text-slate-600">{issues.filter(i => i.source === 'eslint').length} issues</p>
             </div>
             
-            <div className="bg-slate-50 rounded-lg p-4">
-              <div className="flex items-center justify-between mb-2">
-                <h4 className="font-medium text-slate-900">npm audit</h4>
-                <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full">✓</span>
+            <div className="bg-slate-50 rounded-lg p-3">
+              <div className="flex items-center justify-between mb-1">
+                <h4 className="font-medium text-slate-900 text-sm">npm audit</h4>
+                <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded">✓</span>
               </div>
-              <p className="text-sm text-slate-600">{issues.filter(i => i.source === 'npm-audit').length} vulnerabilities</p>
+              <p className="text-xs text-slate-600">{issues.filter(i => i.source === 'npm-audit').length} vulns</p>
             </div>
             
-            <div className="bg-slate-50 rounded-lg p-4">
-              <div className="flex items-center justify-between mb-2">
-                <h4 className="font-medium text-slate-900">Patterns</h4>
-                <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full">✓</span>
+            <div className="bg-slate-50 rounded-lg p-3">
+              <div className="flex items-center justify-between mb-1">
+                <h4 className="font-medium text-slate-900 text-sm">Patterns</h4>
+                <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded">✓</span>
               </div>
-              <p className="text-sm text-slate-600">{issues.filter(i => i.source === 'security-patterns').length} issues</p>
+              <p className="text-xs text-slate-600">{issues.filter(i => i.source === 'security-patterns').length} issues</p>
             </div>
 
-            <div className="bg-slate-50 rounded-lg p-4">
-              <div className="flex items-center justify-between mb-2">
-                <h4 className="font-medium text-slate-900">Semgrep</h4>
-                <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full">✓</span>
+            <div className="bg-slate-50 rounded-lg p-3">
+              <div className="flex items-center justify-between mb-1">
+                <h4 className="font-medium text-slate-900 text-sm">Semgrep</h4>
+                <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded">✓</span>
               </div>
-              <p className="text-sm text-slate-600">{issues.filter(i => i.source === 'semgrep').length} findings</p>
+              <p className="text-xs text-slate-600">{issues.filter(i => i.source === 'semgrep').length} findings</p>
             </div>
 
-            <div className="bg-slate-50 rounded-lg p-4">
-              <div className="flex items-center justify-between mb-2">
-                <h4 className="font-medium text-slate-900">Trivy</h4>
-                <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full">✓</span>
+            <div className="bg-slate-50 rounded-lg p-3">
+              <div className="flex items-center justify-between mb-1">
+                <h4 className="font-medium text-slate-900 text-sm">Trivy</h4>
+                <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded">✓</span>
               </div>
-              <p className="text-sm text-slate-600">{issues.filter(i => i.source === 'trivy').length} vulnerabilities</p>
+              <p className="text-xs text-slate-600">{issues.filter(i => i.source === 'trivy').length} vulns</p>
+            </div>
+
+            <div className="bg-slate-50 rounded-lg p-3">
+              <div className="flex items-center justify-between mb-1">
+                <h4 className="font-medium text-slate-900 text-sm">Secrets</h4>
+                <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded">✓</span>
+              </div>
+              <p className="text-xs text-slate-600">{issues.filter(i => i.source === 'secret-scan').length} secrets</p>
+            </div>
+
+            <div className="bg-slate-50 rounded-lg p-3">
+              <div className="flex items-center justify-between mb-1">
+                <h4 className="font-medium text-slate-900 text-sm">Bandit</h4>
+                <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded">✓</span>
+              </div>
+              <p className="text-xs text-slate-600">{issues.filter(i => i.source === 'bandit').length} issues</p>
+            </div>
+
+            <div className="bg-slate-50 rounded-lg p-3">
+              <div className="flex items-center justify-between mb-1">
+                <h4 className="font-medium text-slate-900 text-sm">Safety</h4>
+                <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded">✓</span>
+              </div>
+              <p className="text-xs text-slate-600">{issues.filter(i => i.source === 'safety').length} vulns</p>
             </div>
           </div>
         </CardContent>

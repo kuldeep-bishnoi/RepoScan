@@ -39,7 +39,15 @@ Preferred communication style: Simple, everyday language.
 - **Relationships**: Foreign key relationship between scans and their associated issues
 
 ### Security Scanning Engine
-- **Multi-Tool Integration**: Combines ESLint, npm audit, and custom security pattern detection
+- **Multi-Tool Integration**: Comprehensive security scanning with 8 different tools:
+  - ESLint for code quality and security linting
+  - npm audit for dependency vulnerability scanning
+  - Custom security pattern matching for additional threat detection
+  - Semgrep for advanced static analysis (SAST)
+  - Trivy for vulnerability and misconfiguration scanning
+  - TruffleHog for secret detection
+  - Bandit for Python security analysis
+  - Safety for Python dependency vulnerability checking
 - **Asynchronous Processing**: Background scan execution with progress tracking
 - **GitHub Integration**: Repository cloning and validation through GitHub API
 - **Real-time Updates**: Progress polling system for live scan status updates
@@ -48,9 +56,13 @@ Preferred communication style: Simple, everyday language.
 - **GitHub API**: Repository validation and metadata retrieval
 - **Git Operations**: Repository cloning using system git commands
 - **Security Tools**: 
-  - ESLint for code quality and security linting
-  - npm audit for dependency vulnerability scanning
-  - Custom security pattern matching for additional threat detection
+  - ESLint for JavaScript/TypeScript code quality
+  - npm audit for Node.js dependency vulnerabilities
+  - Semgrep for multi-language static analysis
+  - Trivy for container and filesystem vulnerability scanning
+  - TruffleHog for secrets and credentials detection
+  - Bandit for Python security issues
+  - Safety for Python package vulnerability checking
 - **Development Tools**: 
   - Replit integration for development environment
   - Vite dev server with HMR for development

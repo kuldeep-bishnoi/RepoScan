@@ -20,6 +20,9 @@ export default function ScanForm({ onScanStarted, disabled = false }: ScanFormPr
     securityPatterns: true,
     semgrep: true,
     trivy: true,
+    secretScan: true,
+    bandit: true,
+    safety: true,
     deepAnalysis: false,
   });
 
@@ -172,6 +175,36 @@ export default function ScanForm({ onScanStarted, disabled = false }: ScanFormPr
               disabled={disabled}
             />
             <Label htmlFor="trivy" className="text-sm text-slate-700">Trivy</Label>
+          </div>
+          
+          <div className="flex items-center space-x-2">
+            <Checkbox 
+              id="secret-scan"
+              checked={scanOptions.secretScan}
+              onCheckedChange={handleOptionChange('secretScan')}
+              disabled={disabled}
+            />
+            <Label htmlFor="secret-scan" className="text-sm text-slate-700">Secret Scan</Label>
+          </div>
+          
+          <div className="flex items-center space-x-2">
+            <Checkbox 
+              id="bandit"
+              checked={scanOptions.bandit}
+              onCheckedChange={handleOptionChange('bandit')}
+              disabled={disabled}
+            />
+            <Label htmlFor="bandit" className="text-sm text-slate-700">Bandit</Label>
+          </div>
+          
+          <div className="flex items-center space-x-2">
+            <Checkbox 
+              id="safety"
+              checked={scanOptions.safety}
+              onCheckedChange={handleOptionChange('safety')}
+              disabled={disabled}
+            />
+            <Label htmlFor="safety" className="text-sm text-slate-700">Safety</Label>
           </div>
           
           <div className="flex items-center space-x-2">

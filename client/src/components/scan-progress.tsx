@@ -56,7 +56,9 @@ export default function ScanProgress({ scanId, repositoryName, onComplete }: Sca
     { name: "npm audit scan", completed: progress > 50, active: progress >= 50 && progress < 60 },
     { name: "Security pattern analysis", completed: progress > 60, active: progress >= 60 && progress < 75 },
     { name: "Semgrep analysis", completed: progress > 75, active: progress >= 75 && progress < 85 },
-    { name: "Trivy security scan", completed: progress > 85, active: progress >= 85 && progress < 95 },
+    { name: "Trivy security scan", completed: progress > 85, active: progress >= 85 && progress < 90 },
+    { name: "Secret scanning", completed: progress > 90, active: progress >= 90 && progress < 95 },
+    { name: "Python security checks", completed: progress > 95, active: progress >= 95 && progress < 100 },
   ];
 
   return (

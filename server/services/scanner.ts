@@ -56,8 +56,26 @@ export class ScannerService {
         issues.push(...trivyIssues);
       }
 
+      if (options.secretScan) {
+        onProgress?.("Scanning for secrets...", 90);
+        const secretIssues = await this.runSecretScan(directory);
+        issues.push(...secretIssues);
+      }
+
+      if (options.bandit) {
+        onProgress?.("Running Bandit Python security scan...", 95);
+        const banditIssues = await this.runBandit(directory);
+        issues.push(...banditIssues);
+      }
+
+      if (options.safety) {
+        onProgress?.("Running Safety dependency check...", 98);
+        const safetyIssues = await this.runSafety(directory);
+        issues.push(...safetyIssues);
+      }
+
       if (options.deepAnalysis) {
-        onProgress?.("Running deep analysis...", 95);
+        onProgress?.("Running deep analysis...", 99);
         const deepIssues = await this.runDeepAnalysis(directory);
         issues.push(...deepIssues);
       }
@@ -331,9 +349,128 @@ export class ScannerService {
     }
   }
 
+  private async runSecretScan(directory: string): Promise<Omit<Issue, 'id' | 'scanId'>[]> {
+    try {
+      // Use TruffleHog to scan for secrets
+      const trufflehogPath = '/home/runner/workspace/trufflehog';
+      const { stdout } = await execAsync(`${trufflehogPath} filesystem "${directory}" --json --no-verification`, {
+        timeout: 120000, // 2 minute timeout
+      }).catch(error => {
+        return { stdout: error.stdout || '' };
+      });
+
+      const issues: Omit<Issue, 'id' | 'scanId'>[] = [];
+      
+      if (stdout) {
+        const lines = stdout.split('\n').filter(line => line.trim());
+        for (const line: string of lines) {
+          try {
+            const result = JSON.parse(line);
+            if (result.DetectorName && result.SourceMetadata) {
+              issues.push({
+                severity: 'high', // Secrets are typically high severity
+                title: `Secret detected: ${result.DetectorName}`,
+                description: `Potential secret or credential found: ${result.DetectorName}`,
+                file: result.SourceMetadata.Data?.Filesystem?.file || 'Unknown file',
+                line: result.SourceMetadata.Data?.Filesystem?.line || null,
+                column: null,
+                rule: result.DetectorName,
+                source: 'secret-scan',
+                remediation: 'Remove the secret from code and rotate credentials if compromised',
+                cve: null,
+              });
+            }
+          } catch (parseError) {
+            // Skip malformed JSON lines
+          }
+        }
+      }
+
+      return issues;
+    } catch (error) {
+      console.warn('Secret scan failed:', error);
+      return [];
+    }
+  }
+
+  private async runBandit(directory: string): Promise<Omit<Issue, 'id' | 'scanId'>[]> {
+    try {
+      // Run Bandit for Python security issues
+      const { stdout } = await execAsync(`python3 -m bandit -r "${directory}" -f json`, {
+        timeout: 120000, // 2 minute timeout
+      }).catch(error => {
+        return { stdout: error.stdout || '{"results": []}' };
+      });
+
+      const results = JSON.parse(stdout || '{"results": []}');
+      const issues: Omit<Issue, 'id' | 'scanId'>[] = [];
+
+      if (results.results) {
+        for (const result of results.results) {
+          issues.push({
+            severity: this.mapBanditSeverity(result.issue_severity),
+            title: result.test_name,
+            description: result.issue_text,
+            file: result.filename.replace(directory, ''),
+            line: result.line_number,
+            column: null,
+            rule: result.test_id,
+            source: 'bandit',
+            remediation: result.more_info || 'Review and fix the security issue',
+            cve: null,
+          });
+        }
+      }
+
+      return issues;
+    } catch (error) {
+      console.warn('Bandit analysis failed:', error);
+      return [];
+    }
+  }
+
+  private async runSafety(directory: string): Promise<Omit<Issue, 'id' | 'scanId'>[]> {
+    try {
+      // Run Safety to check Python dependencies for known vulnerabilities
+      const { stdout } = await execAsync(`python3 -m safety check --json --full-report`, {
+        cwd: directory,
+        timeout: 120000, // 2 minute timeout
+      }).catch(error => {
+        return { stdout: error.stdout || '[]' };
+      });
+
+      const results = JSON.parse(stdout || '[]');
+      const issues: Omit<Issue, 'id' | 'scanId'>[] = [];
+
+      for (const result of results) {
+        if (result.vulnerability) {
+          issues.push({
+            severity: this.mapSafetySeverity(result.vulnerability.severity || 'UNKNOWN'),
+            title: `${result.package_name}: ${result.vulnerability.id}`,
+            description: result.vulnerability.summary,
+            file: 'requirements.txt / setup.py',
+            line: null,
+            column: null,
+            rule: result.vulnerability.id,
+            source: 'safety',
+            remediation: result.vulnerability.fixed_in ? 
+              `Update ${result.package_name} to version ${result.vulnerability.fixed_in}` : 
+              `Update ${result.package_name} to a secure version`,
+            cve: result.vulnerability.cve || null,
+          });
+        }
+      }
+
+      return issues;
+    } catch (error) {
+      console.warn('Safety check failed:', error);
+      return [];
+    }
+  }
+
   private async runDeepAnalysis(directory: string): Promise<Omit<Issue, 'id' | 'scanId'>[]> {
     // Placeholder for additional deep analysis tools
-    // Could integrate with CodeQL, Bandit for Python, etc.
+    // Could integrate with CodeQL, additional language-specific tools, etc.
     return [];
   }
 
@@ -389,6 +526,33 @@ export class ScannerService {
       case 'LOW':
       case 'UNKNOWN':
       case 'NEGLIGIBLE':
+      default:
+        return 'low';
+    }
+  }
+
+  private mapBanditSeverity(banditSeverity: string): 'high' | 'medium' | 'low' {
+    switch (banditSeverity?.toUpperCase()) {
+      case 'HIGH':
+        return 'high';
+      case 'MEDIUM':
+        return 'medium';
+      case 'LOW':
+      default:
+        return 'low';
+    }
+  }
+
+  private mapSafetySeverity(safetySeverity: string): 'high' | 'medium' | 'low' {
+    switch (safetySeverity?.toUpperCase()) {
+      case 'CRITICAL':
+      case 'HIGH':
+        return 'high';
+      case 'MEDIUM':
+      case 'MODERATE':
+        return 'medium';
+      case 'LOW':
+      case 'UNKNOWN':
       default:
         return 'low';
     }
