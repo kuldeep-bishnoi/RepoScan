@@ -142,6 +142,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     
     // Secure path creation with validation
     const baseTempDir = os.tmpdir();
+    // Validate the secure directory before using it in path operations
+    if (!secureDirectory || secureDirectory.includes('..') || secureDirectory.includes('/') || secureDirectory.includes('\\')) {
+      throw new Error('Invalid secure directory generated');
+    }
     const tempDir = SecurityUtils.validatePath(baseTempDir, path.join(baseTempDir, secureDirectory));
     
     try {
