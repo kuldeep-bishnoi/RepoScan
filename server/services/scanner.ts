@@ -18,6 +18,18 @@ export interface ScanResult {
 }
 
 export class ScannerService {
+  /**
+   * Safely gets relative path from base directory, ensuring no path traversal
+   */
+  private getRelativePath(baseDirectory: string, filePath: string): string {
+    try {
+      const validatedPath = SecurityUtils.validatePath(baseDirectory, filePath);
+      return validatedPath.replace(baseDirectory, '').replace(/^[\/\\]/, '');
+    } catch (error) {
+      // If path validation fails, return a safe fallback
+      return path.basename(filePath);
+    }
+  }
 
   async scanDirectory(directory: string, options: ScanOptions, onProgress?: (step: string, progress: number) => void): Promise<ScanResult> {
     const issues: Omit<Issue, 'id' | 'scanId'>[] = [];
@@ -118,7 +130,7 @@ export class ScannerService {
             severity,
             title: message.message,
             description: `ESLint rule violation: ${message.ruleId || 'unknown'}`,
-            file: SecurityUtils.validatePath(directory, result.filePath).replace(directory, ''),
+            file: this.getRelativePath(directory, result.filePath),
             line: message.line,
             column: message.column,
             rule: message.ruleId,
@@ -139,7 +151,9 @@ export class ScannerService {
   private async runNpmAudit(directory: string): Promise<Omit<Issue, 'id' | 'scanId'>[]> {
     try {
       // Check if package.json exists (validate path for security)
-      const packageJsonPath = SecurityUtils.validatePath(directory, path.join(directory, 'package.json'));
+      const sanitizedDirectory = path.resolve(directory);
+      const proposedPackageJsonPath = path.join(sanitizedDirectory, 'package.json');
+      const packageJsonPath = SecurityUtils.validatePath(sanitizedDirectory, proposedPackageJsonPath);
       await fs.access(packageJsonPath);
       
       const { stdout } = await execAsync('npm audit --json', {
@@ -219,7 +233,9 @@ export class ScannerService {
 
       for (const file of files) {
         try {
-          const content = await fs.readFile(file, 'utf-8');
+          // Validate file path before reading for security
+          const safePath = SecurityUtils.validatePath(directory, file);
+          const content = await fs.readFile(safePath, 'utf-8');
           const lines = content.split('\n');
 
           for (const { pattern, severity, title, description, remediation } of patterns) {
@@ -229,7 +245,7 @@ export class ScannerService {
                   severity,
                   title,
                   description,
-                  file: SecurityUtils.validatePath(directory, file).replace(directory, ''),
+                  file: this.getRelativePath(directory, file),
                   line: lineNumber + 1,
                   column: null,
                   rule: null,
@@ -274,7 +290,7 @@ export class ScannerService {
             severity,
             title: result.extra?.message || result.check_id,
             description: `Semgrep finding: ${result.extra?.message || 'Security issue detected'}`,
-            file: SecurityUtils.validatePath(directory, result.path).replace(directory, ''),
+            file: this.getRelativePath(directory, result.path),
             line: result.start?.line || null,
             column: result.start?.col || null,
             rule: result.check_id,
@@ -414,7 +430,7 @@ export class ScannerService {
             severity: this.mapBanditSeverity(result.issue_severity),
             title: result.test_name,
             description: result.issue_text,
-            file: SecurityUtils.validatePath(directory, result.filename).replace(directory, ''),
+            file: this.getRelativePath(directory, result.filename),
             line: result.line_number,
             column: null,
             rule: result.test_id,

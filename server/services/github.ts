@@ -57,8 +57,13 @@ export class GitHubService {
   }
 
   async cloneRepository(repository: GitHubRepository, targetDir: string): Promise<string> {
+    // First validate the target directory is safe
+    const sanitizedTargetDir = path.resolve(targetDir);
+    
+    // Generate secure directory name and validate the full path
     const secureDirectoryName = SecurityUtils.generateSecureDirectory(repository.name);
-    const cloneDir = SecurityUtils.validatePath(targetDir, path.join(targetDir, secureDirectoryName));
+    const proposedPath = path.join(sanitizedTargetDir, secureDirectoryName);
+    const cloneDir = SecurityUtils.validatePath(sanitizedTargetDir, proposedPath);
     
     try {
       // Remove directory if it exists

@@ -139,7 +139,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     // Validate and sanitize input
     const validatedScanId = SecurityUtils.validateScanId(scanId);
     const secureDirectory = SecurityUtils.generateSecureDirectory('secure-scan', validatedScanId);
-    const tempDir = path.join(os.tmpdir(), secureDirectory);
+    
+    // Secure path creation with validation
+    const baseTempDir = os.tmpdir();
+    const tempDir = SecurityUtils.validatePath(baseTempDir, path.join(baseTempDir, secureDirectory));
     
     try {
       // Update scan status
