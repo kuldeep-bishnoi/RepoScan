@@ -3,10 +3,12 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { GitHubService } from "./services/github";
 import { ScannerService } from "./services/scanner";
+import { SecurityUtils } from "./utils/security";
 import { insertScanSchema, scanOptionsSchema } from "@shared/schema";
 import { z } from "zod";
 import os from "os";
 import path from "path";
+import crypto from "crypto";
 
 const githubService = new GitHubService();
 const scannerService = new ScannerService();
@@ -28,7 +30,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get single scan with issues
   app.get("/api/scans/:id", async (req, res) => {
     try {
-      const scan = await storage.getScan(req.params.id);
+      const scanId = SecurityUtils.validateScanId(req.params.id);
+      const scan = await storage.getScan(scanId);
       if (!scan) {
         return res.status(404).json({ message: "Scan not found" });
       }
@@ -36,6 +39,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const issues = await storage.getIssuesByScan(scan.id);
       res.json({ ...scan, issues });
     } catch (error) {
+      SecurityUtils.safeErrorLog("Failed to fetch scan", error);
       res.status(500).json({ message: "Failed to fetch scan" });
     }
   });
@@ -129,8 +133,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+
+
   async function performScan(scanId: string, repository: any, scanOptions: any) {
-    const tempDir = path.join(os.tmpdir(), `secure-scan-${scanId}`);
+    // Validate and sanitize input
+    const validatedScanId = SecurityUtils.validateScanId(scanId);
+    const secureDirectory = SecurityUtils.generateSecureDirectory('secure-scan', validatedScanId);
+    const tempDir = path.join(os.tmpdir(), secureDirectory);
     
     try {
       // Update scan status
@@ -182,7 +191,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       activeScans.delete(scanId);
     } catch (error) {
-      console.error("Scan error:", error);
+      SecurityUtils.safeErrorLog("Scan failed", error);
       await storage.updateScan(scanId, {
         status: "failed",
         completedAt: new Date(),

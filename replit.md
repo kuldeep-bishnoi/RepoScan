@@ -51,6 +51,12 @@ Preferred communication style: Simple, everyday language.
 - **Asynchronous Processing**: Background scan execution with progress tracking
 - **GitHub Integration**: Repository cloning and validation through GitHub API
 - **Real-time Updates**: Progress polling system for live scan status updates
+- **Security Hardening**: 
+  - Path traversal protection with secure directory validation
+  - Input sanitization and validation for all user inputs
+  - Secure logging practices preventing format string vulnerabilities
+  - UUID validation for scan IDs to prevent injection attacks
+  - Integrity checking for external scripts with SHA-384 hashes
 
 ### External Dependencies
 - **GitHub API**: Repository validation and metadata retrieval
@@ -84,3 +90,11 @@ Preferred communication style: Simple, everyday language.
 - **Shared Schema**: Common TypeScript types and Zod schemas in shared directory
 - **Component Architecture**: Modular React components with clear separation of concerns
 - **Service Layer**: Dedicated service classes for GitHub operations and security scanning
+- **Security Utilities**: Centralized security utilities in `server/utils/security.ts` for input validation and safe operations
+
+### Recent Security Enhancements (August 14, 2025)
+- **Vulnerability Resolution**: Fixed all critical path traversal vulnerabilities with secure path validation
+- **Logging Security**: Replaced unsafe logging practices with structured secure logging to prevent format string attacks
+- **Input Validation**: Added comprehensive input sanitization for repository names, scan IDs, and file paths
+- **Directory Protection**: Implemented secure temporary directory generation with randomized suffixes
+- **Error Handling**: Enhanced error handling to prevent information leakage in error messages

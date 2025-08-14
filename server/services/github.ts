@@ -2,6 +2,8 @@ import { exec } from "child_process";
 import { promisify } from "util";
 import fs from "fs/promises";
 import path from "path";
+import crypto from "crypto";
+import { SecurityUtils } from "../utils/security";
 
 const execAsync = promisify(exec);
 
@@ -14,6 +16,7 @@ export interface GitHubRepository {
 }
 
 export class GitHubService {
+
   async validateAndParseUrl(url: string): Promise<GitHubRepository> {
     const githubUrlRegex = /^https:\/\/github\.com\/([^\/]+)\/([^\/]+)(?:\.git)?(?:\/.*)?$/;
     const match = url.match(githubUrlRegex);
@@ -54,7 +57,8 @@ export class GitHubService {
   }
 
   async cloneRepository(repository: GitHubRepository, targetDir: string): Promise<string> {
-    const cloneDir = path.join(targetDir, repository.name);
+    const secureDirectoryName = SecurityUtils.generateSecureDirectory(repository.name);
+    const cloneDir = SecurityUtils.validatePath(targetDir, path.join(targetDir, secureDirectoryName));
     
     try {
       // Remove directory if it exists
@@ -73,7 +77,7 @@ export class GitHubService {
     try {
       await fs.rm(directory, { recursive: true, force: true });
     } catch (error) {
-      console.warn(`Failed to cleanup directory ${directory}:`, error);
+      SecurityUtils.safeErrorLog('Failed to cleanup directory', error);
     }
   }
 }

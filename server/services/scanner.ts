@@ -3,6 +3,7 @@ import { promisify } from "util";
 import path from "path";
 import fs from "fs/promises";
 import { type Issue, type ScanOptions } from "@shared/schema";
+import { SecurityUtils } from "../utils/security";
 
 const execAsync = promisify(exec);
 
@@ -17,6 +18,7 @@ export interface ScanResult {
 }
 
 export class ScannerService {
+
   async scanDirectory(directory: string, options: ScanOptions, onProgress?: (step: string, progress: number) => void): Promise<ScanResult> {
     const issues: Omit<Issue, 'id' | 'scanId'>[] = [];
     let filesScanned = 0;
@@ -116,7 +118,7 @@ export class ScannerService {
             severity,
             title: message.message,
             description: `ESLint rule violation: ${message.ruleId || 'unknown'}`,
-            file: result.filePath.replace(directory, ''),
+            file: SecurityUtils.validatePath(directory, result.filePath).replace(directory, ''),
             line: message.line,
             column: message.column,
             rule: message.ruleId,
@@ -129,15 +131,16 @@ export class ScannerService {
 
       return issues;
     } catch (error) {
-      console.warn('ESLint analysis failed:', error);
+      SecurityUtils.safeErrorLog('ESLint analysis failed', error);
       return [];
     }
   }
 
   private async runNpmAudit(directory: string): Promise<Omit<Issue, 'id' | 'scanId'>[]> {
     try {
-      // Check if package.json exists
-      await fs.access(path.join(directory, 'package.json'));
+      // Check if package.json exists (validate path for security)
+      const packageJsonPath = SecurityUtils.validatePath(directory, path.join(directory, 'package.json'));
+      await fs.access(packageJsonPath);
       
       const { stdout } = await execAsync('npm audit --json', {
         cwd: directory,
@@ -169,7 +172,7 @@ export class ScannerService {
 
       return issues;
     } catch (error) {
-      console.warn('npm audit failed:', error);
+      SecurityUtils.safeErrorLog('npm audit failed', error);
       return [];
     }
   }
@@ -226,7 +229,7 @@ export class ScannerService {
                   severity,
                   title,
                   description,
-                  file: file.replace(directory, ''),
+                  file: SecurityUtils.validatePath(directory, file).replace(directory, ''),
                   line: lineNumber + 1,
                   column: null,
                   rule: null,
@@ -245,7 +248,7 @@ export class ScannerService {
 
       return issues;
     } catch (error) {
-      console.warn('Security pattern analysis failed:', error);
+      SecurityUtils.safeErrorLog('Security pattern analysis failed', error);
       return [];
     }
   }
@@ -271,7 +274,7 @@ export class ScannerService {
             severity,
             title: result.extra?.message || result.check_id,
             description: `Semgrep finding: ${result.extra?.message || 'Security issue detected'}`,
-            file: result.path.replace(directory, ''),
+            file: SecurityUtils.validatePath(directory, result.path).replace(directory, ''),
             line: result.start?.line || null,
             column: result.start?.col || null,
             rule: result.check_id,
@@ -284,7 +287,7 @@ export class ScannerService {
 
       return issues;
     } catch (error) {
-      console.warn('Semgrep analysis failed:', error);
+      SecurityUtils.safeErrorLog('Semgrep analysis failed', error);
       return [];
     }
   }
@@ -344,7 +347,7 @@ export class ScannerService {
 
       return issues;
     } catch (error) {
-      console.warn('Trivy analysis failed:', error);
+      SecurityUtils.safeErrorLog('Trivy analysis failed', error);
       return [];
     }
   }
@@ -388,7 +391,7 @@ export class ScannerService {
 
       return issues;
     } catch (error) {
-      console.warn('Secret scan failed:', error);
+      SecurityUtils.safeErrorLog('Secret scan failed', error);
       return [];
     }
   }
@@ -411,7 +414,7 @@ export class ScannerService {
             severity: this.mapBanditSeverity(result.issue_severity),
             title: result.test_name,
             description: result.issue_text,
-            file: result.filename.replace(directory, ''),
+            file: SecurityUtils.validatePath(directory, result.filename).replace(directory, ''),
             line: result.line_number,
             column: null,
             rule: result.test_id,
@@ -424,7 +427,7 @@ export class ScannerService {
 
       return issues;
     } catch (error) {
-      console.warn('Bandit analysis failed:', error);
+      SecurityUtils.safeErrorLog('Bandit analysis failed', error);
       return [];
     }
   }
@@ -463,7 +466,7 @@ export class ScannerService {
 
       return issues;
     } catch (error) {
-      console.warn('Safety check failed:', error);
+      SecurityUtils.safeErrorLog('Safety check failed', error);
       return [];
     }
   }
