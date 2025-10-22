@@ -28,6 +28,22 @@ export const issues = pgTable("issues", {
   source: text("source").notNull(), // eslint, npm-audit, security-patterns, semgrep, trivy, secret-scan, bandit, safety
   remediation: text("remediation"),
   cve: text("cve"),
+  remediationStatus: text("remediation_status"), // pending, success, failed
+  remediatedCode: text("remediated_code"),
+  prUrl: text("pr_url"),
+  prNumber: integer("pr_number"),
+  remediatedAt: timestamp("remediated_at"),
+});
+
+export const modelSettings = pgTable("model_settings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  provider: text("provider").notNull(), // ollama, openai, anthropic, custom
+  modelName: text("model_name").notNull(),
+  endpoint: text("endpoint"), // for local/custom models
+  apiKey: text("api_key"), // for cloud providers
+  isDefault: text("is_default").notNull().default("false"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
 export const insertScanSchema = createInsertSchema(scans).omit({
@@ -42,10 +58,18 @@ export const insertIssueSchema = createInsertSchema(issues).omit({
   id: true,
 });
 
+export const insertModelSettingsSchema = createInsertSchema(modelSettings).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 export type InsertScan = z.infer<typeof insertScanSchema>;
 export type Scan = typeof scans.$inferSelect;
 export type InsertIssue = z.infer<typeof insertIssueSchema>;
 export type Issue = typeof issues.$inferSelect;
+export type InsertModelSettings = z.infer<typeof insertModelSettingsSchema>;
+export type ModelSettings = typeof modelSettings.$inferSelect;
 
 // Extended types for API responses
 export type ScanWithIssues = Scan & { issues: Issue[] };

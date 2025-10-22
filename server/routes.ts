@@ -3,8 +3,10 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { GitHubService } from "./services/github";
 import { ScannerService } from "./services/scanner";
+import { RemediationService } from "./services/remediation";
+import { GitHubPRService } from "./services/github-pr";
 import { SecurityUtils } from "./utils/security";
-import { insertScanSchema, scanOptionsSchema } from "@shared/schema";
+import { insertScanSchema, scanOptionsSchema, insertModelSettingsSchema } from "@shared/schema";
 import { z } from "zod";
 import os from "os";
 import path from "path";
@@ -12,6 +14,8 @@ import crypto from "crypto";
 
 const githubService = new GitHubService();
 const scannerService = new ScannerService();
+const remediationService = new RemediationService();
+const githubPRService = new GitHubPRService();
 
 // Store active scans for progress tracking
 const activeScans = new Map<string, { status: string; progress: number; currentStep: string | null }>();
@@ -134,6 +138,229 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
 
+
+  // Model settings routes
+  app.get("/api/model-settings", async (req, res) => {
+    try {
+      const settings = await storage.getAllModelSettings();
+      res.json(settings);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch model settings" });
+    }
+  });
+
+  app.post("/api/model-settings", async (req, res) => {
+    try {
+      const validated = insertModelSettingsSchema.parse(req.body);
+      const settings = await storage.createModelSettings(validated);
+      res.json(settings);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid request body", errors: error.errors });
+      }
+      res.status(500).json({ message: "Failed to create model settings" });
+    }
+  });
+
+  app.patch("/api/model-settings/:id", async (req, res) => {
+    try {
+      const settingId = req.params.id;
+      const settings = await storage.updateModelSettings(settingId, req.body);
+      if (!settings) {
+        return res.status(404).json({ message: "Model settings not found" });
+      }
+      res.json(settings);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update model settings" });
+    }
+  });
+
+  app.delete("/api/model-settings/:id", async (req, res) => {
+    try {
+      const settingId = req.params.id;
+      await storage.deleteModelSettings(settingId);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete model settings" });
+    }
+  });
+
+  // Remediate issue
+  app.post("/api/issues/:id/remediate", async (req, res) => {
+    try {
+      const issueId = req.params.id;
+      const issue = await storage.getIssue(issueId);
+      
+      if (!issue) {
+        return res.status(404).json({ message: "Issue not found" });
+      }
+
+      const scan = await storage.getScan(issue.scanId);
+      if (!scan) {
+        return res.status(404).json({ message: "Scan not found" });
+      }
+
+      // Get model settings
+      const modelSettings = await storage.getDefaultModelSettings();
+      if (!modelSettings) {
+        return res.status(400).json({ message: "No default model configured. Please configure a model first." });
+      }
+
+      // Clone repository again for remediation
+      const repository = await githubService.validateAndParseUrl(scan.repositoryUrl);
+      const tempDir = path.join(os.tmpdir(), `scan-${crypto.randomBytes(8).toString('hex')}`);
+      const repoPath = await githubService.cloneRepository(repository, tempDir);
+
+      try {
+        const result = await remediationService.remediateIssue(issue, repoPath, modelSettings);
+        
+        if (result.success) {
+          await storage.updateIssue(issueId, {
+            remediationStatus: "success",
+            remediatedCode: result.fixedCode,
+            remediatedAt: new Date(),
+          });
+
+          res.json({
+            success: true,
+            diff: result.diff,
+            explanation: result.explanation,
+          });
+        } else {
+          await storage.updateIssue(issueId, {
+            remediationStatus: "failed",
+            remediatedAt: new Date(),
+          });
+
+          res.status(400).json({
+            success: false,
+            error: result.error,
+          });
+        }
+      } finally {
+        await githubService.cleanup(tempDir);
+      }
+    } catch (error) {
+      res.status(500).json({ 
+        success: false,
+        error: error instanceof Error ? error.message : "Failed to remediate issue" 
+      });
+    }
+  });
+
+  // Create PR for remediated issue
+  app.post("/api/issues/:id/create-pr", async (req, res) => {
+    try {
+      const issueId = req.params.id;
+      const issue = await storage.getIssue(issueId);
+      
+      if (!issue) {
+        return res.status(404).json({ message: "Issue not found" });
+      }
+
+      if (!issue.remediatedCode || issue.remediationStatus !== "success") {
+        return res.status(400).json({ message: "Issue must be successfully remediated before creating a PR" });
+      }
+
+      const scan = await storage.getScan(issue.scanId);
+      if (!scan) {
+        return res.status(404).json({ message: "Scan not found" });
+      }
+
+      const repoInfo = githubPRService.parseRepoUrl(scan.repositoryUrl);
+      if (!repoInfo) {
+        return res.status(400).json({ message: "Invalid repository URL" });
+      }
+
+      // Clone repository
+      const repository = await githubService.validateAndParseUrl(scan.repositoryUrl);
+      const tempDir = path.join(os.tmpdir(), `pr-${crypto.randomBytes(8).toString('hex')}`);
+      const repoPath = await githubService.cloneRepository(repository, tempDir);
+
+      try {
+        // Get authenticated user for git config
+        const user = await githubPRService.getAuthenticatedUser();
+        await githubPRService.setupGitUser(
+          repoPath,
+          user.name || user.login,
+          `${user.login}@users.noreply.github.com`
+        );
+
+        // Apply fix to file
+        if (!issue.file) {
+          throw new Error("Issue must have an associated file to create a PR");
+        }
+
+        // Validate file path to prevent path traversal
+        const sanitizedFilePath = SecurityUtils.validatePath(repoPath, path.join(repoPath, issue.file));
+        const relativeFilePath = path.relative(repoPath, sanitizedFilePath);
+        
+        await remediationService.applyFix(repoPath, relativeFilePath, issue.remediatedCode);
+
+        // Create branch and commit
+        const branchName = `fix/${issue.severity}-${issue.id.substring(0, 8)}`;
+        const commitMessage = `Fix: ${issue.title}\n\n${issue.description}`;
+        
+        await githubPRService.createBranchAndCommit(
+          repoPath,
+          branchName,
+          commitMessage,
+          relativeFilePath
+        );
+
+        // Push branch
+        await githubPRService.pushBranch(repoPath, branchName);
+
+        // Create PR
+        const prTitle = `🔒 Security Fix: ${issue.title}`;
+        const prBody = `## Security Issue Remediation
+        
+**Severity:** ${issue.severity.toUpperCase()}
+**Source:** ${issue.source}
+${issue.cve ? `**CVE:** ${issue.cve}` : ''}
+
+### Description
+${issue.description}
+
+### Changes Made
+This PR automatically fixes the security issue identified by SecureScan.
+
+${issue.remediation ? `### Remediation
+${issue.remediation}` : ''}
+
+---
+*This PR was automatically generated by SecureScan*`;
+
+        const pr = await githubPRService.createPullRequest({
+          owner: repoInfo.owner,
+          repo: repoInfo.repo,
+          title: prTitle,
+          body: prBody,
+          head: branchName,
+          base: repository.defaultBranch,
+        });
+
+        // Update issue with PR info
+        await storage.updateIssue(issueId, {
+          prUrl: pr.htmlUrl,
+          prNumber: pr.number,
+        });
+
+        res.json({
+          success: true,
+          prUrl: pr.htmlUrl,
+          prNumber: pr.number,
+        });
+      } finally {
+        await githubService.cleanup(tempDir);
+      }
+    } catch (error) {
+      res.status(500).json({ 
+        success: false,
+        error: error instanceof Error ? error.message : "Failed to create PR" 
+      });
+    }
+  });
 
   async function performScan(scanId: string, repository: any, scanOptions: any) {
     // Validate and sanitize input

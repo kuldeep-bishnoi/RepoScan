@@ -1,18 +1,99 @@
 import { useState } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
+import DiffViewer from "./diff-viewer";
 import type { Issue } from "@shared/schema";
 
 interface IssueListProps {
   issues: Issue[];
+  scanId: string;
 }
 
-export default function IssueList({ issues }: IssueListProps) {
+export default function IssueList({ issues, scanId }: IssueListProps) {
   const [activeFilter, setActiveFilter] = useState<string>("all");
   const [sortBy, setSortBy] = useState<string>("severity");
   const [currentPage, setCurrentPage] = useState(1);
+  const [selectedDiff, setSelectedDiff] = useState<{ diff: string; issueTitle: string; issueId: string } | null>(null);
   const itemsPerPage = 10;
+
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  const remediateMutation = useMutation({
+    mutationFn: async (issueId: string) => {
+      const response = await apiRequest("POST", `/api/issues/${issueId}/remediate`, {});
+      return response.json();
+    },
+    onSuccess: (data, issueId) => {
+      if (data.success) {
+        toast({
+          title: "Remediation Successful",
+          description: "Code fix has been generated. Review the diff before creating a PR.",
+        });
+        queryClient.invalidateQueries({ queryKey: ["/api/scans", scanId] });
+        
+        const issue = issues.find(i => i.id === issueId);
+        if (issue && data.diff) {
+          setSelectedDiff({
+            diff: data.diff,
+            issueTitle: issue.title,
+            issueId: issueId,
+          });
+        }
+      } else {
+        toast({
+          title: "Remediation Failed",
+          description: data.error || "Failed to generate fix",
+          variant: "destructive",
+        });
+      }
+    },
+    onError: (error) => {
+      toast({
+        title: "Remediation Failed",
+        description: error instanceof Error ? error.message : "An error occurred",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const createPRMutation = useMutation({
+    mutationFn: async (issueId: string) => {
+      const response = await apiRequest("POST", `/api/issues/${issueId}/create-pr`, {});
+      return response.json();
+    },
+    onSuccess: (data) => {
+      if (data.success) {
+        toast({
+          title: "Pull Request Created",
+          description: `PR #${data.prNumber} has been created successfully`,
+        });
+        queryClient.invalidateQueries({ queryKey: ["/api/scans", scanId] });
+        setSelectedDiff(null);
+        
+        if (data.prUrl) {
+          window.open(data.prUrl, '_blank');
+        }
+      } else {
+        toast({
+          title: "PR Creation Failed",
+          description: data.error || "Failed to create pull request",
+          variant: "destructive",
+        });
+      }
+    },
+    onError: (error) => {
+      toast({
+        title: "PR Creation Failed",
+        description: error instanceof Error ? error.message : "An error occurred",
+        variant: "destructive",
+      });
+    },
+  });
 
   // Filter issues
   const filteredIssues = issues.filter(issue => {
@@ -197,9 +278,71 @@ export default function IssueList({ issues }: IssueListProps) {
                     </span>
                   )}
                 </div>
+                
+                {/* Remediation Action Buttons */}
+                <div className="flex items-center gap-2 mt-4">
+                  {issue.file && !issue.remediationStatus && (
+                    <Button
+                      size="sm"
+                      onClick={() => remediateMutation.mutate(issue.id)}
+                      disabled={remediateMutation.isPending}
+                      data-testid={`button-remediate-${issue.id}`}
+                    >
+                      <i className="fas fa-magic mr-2"></i>
+                      {remediateMutation.isPending ? "Generating Fix..." : "Auto-Fix with AI"}
+                    </Button>
+                  )}
+                  
+                  {issue.remediationStatus === "success" && issue.remediatedCode && !issue.prUrl && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        if (issue.remediatedCode) {
+                          const diffPreview = `--- a/${issue.file}\n+++ b/${issue.file}\n@@ Fixed by AI @@`;
+                          setSelectedDiff({
+                            diff: diffPreview,
+                            issueTitle: issue.title,
+                            issueId: issue.id,
+                          });
+                        }
+                      }}
+                      data-testid={`button-create-pr-${issue.id}`}
+                    >
+                      <i className="fas fa-code-branch mr-2"></i>
+                      Create Pull Request
+                    </Button>
+                  )}
+                  
+                  {issue.prUrl && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-green-600">
+                        <i className="fas fa-check-circle mr-1"></i>
+                        PR #{issue.prNumber} created
+                      </span>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => window.open(issue.prUrl!, '_blank')}
+                        data-testid={`button-view-pr-${issue.id}`}
+                      >
+                        <i className="fas fa-external-link-alt mr-2"></i>
+                        View PR
+                      </Button>
+                    </div>
+                  )}
+                  
+                  {issue.remediationStatus === "failed" && (
+                    <span className="text-xs text-red-600">
+                      <i className="fas fa-exclamation-circle mr-1"></i>
+                      Auto-fix failed
+                    </span>
+                  )}
+                </div>
               </div>
-              {issue.cve && (
-                <div className="flex-shrink-0">
+              
+              <div className="flex-shrink-0">
+                {issue.cve && (
                   <Button 
                     variant="ghost" 
                     size="sm"
@@ -209,8 +352,8 @@ export default function IssueList({ issues }: IssueListProps) {
                   >
                     <i className="fas fa-external-link-alt"></i>
                   </Button>
-                </div>
-              )}
+                )}
+              </div>
             </div>
           </div>
         ))}
@@ -259,6 +402,18 @@ export default function IssueList({ issues }: IssueListProps) {
             </div>
           </div>
         </div>
+      )}
+      
+      {/* Diff Viewer Dialog */}
+      {selectedDiff && (
+        <DiffViewer
+          isOpen={true}
+          onClose={() => setSelectedDiff(null)}
+          diff={selectedDiff.diff}
+          issueTitle={selectedDiff.issueTitle}
+          onCreatePR={() => createPRMutation.mutate(selectedDiff.issueId)}
+          isCreatingPR={createPRMutation.isPending}
+        />
       )}
     </Card>
   );

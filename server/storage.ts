@@ -1,4 +1,4 @@
-import { type Scan, type InsertScan, type Issue, type InsertIssue } from "@shared/schema";
+import { type Scan, type InsertScan, type Issue, type InsertIssue, type ModelSettings, type InsertModelSettings } from "@shared/schema";
 import { randomUUID } from "crypto";
 
 export interface IStorage {
@@ -10,17 +10,29 @@ export interface IStorage {
   
   // Issue operations
   createIssue(issue: InsertIssue): Promise<Issue>;
+  getIssue(id: string): Promise<Issue | undefined>;
+  updateIssue(id: string, updates: Partial<Issue>): Promise<Issue | undefined>;
   getIssuesByScan(scanId: string): Promise<Issue[]>;
   deleteIssuesByScan(scanId: string): Promise<void>;
+
+  // Model settings operations
+  createModelSettings(settings: InsertModelSettings): Promise<ModelSettings>;
+  getModelSettings(id: string): Promise<ModelSettings | undefined>;
+  getAllModelSettings(): Promise<ModelSettings[]>;
+  getDefaultModelSettings(): Promise<ModelSettings | undefined>;
+  updateModelSettings(id: string, updates: Partial<ModelSettings>): Promise<ModelSettings | undefined>;
+  deleteModelSettings(id: string): Promise<void>;
 }
 
 export class MemStorage implements IStorage {
   private scans: Map<string, Scan>;
   private issues: Map<string, Issue>;
+  private modelSettings: Map<string, ModelSettings>;
 
   constructor() {
     this.scans = new Map();
     this.issues = new Map();
+    this.modelSettings = new Map();
   }
 
   async createScan(insertScan: InsertScan): Promise<Scan> {
@@ -68,9 +80,27 @@ export class MemStorage implements IStorage {
       rule: insertIssue.rule ?? null,
       remediation: insertIssue.remediation ?? null,
       cve: insertIssue.cve ?? null,
+      remediationStatus: null,
+      remediatedCode: null,
+      prUrl: null,
+      prNumber: null,
+      remediatedAt: null,
     };
     this.issues.set(id, issue);
     return issue;
+  }
+
+  async getIssue(id: string): Promise<Issue | undefined> {
+    return this.issues.get(id);
+  }
+
+  async updateIssue(id: string, updates: Partial<Issue>): Promise<Issue | undefined> {
+    const issue = this.issues.get(id);
+    if (!issue) return undefined;
+    
+    const updatedIssue = { ...issue, ...updates };
+    this.issues.set(id, updatedIssue);
+    return updatedIssue;
   }
 
   async getIssuesByScan(scanId: string): Promise<Issue[]> {
@@ -90,6 +120,47 @@ export class MemStorage implements IStorage {
     for (const [id] of entriesToDelete) {
       this.issues.delete(id);
     }
+  }
+
+  async createModelSettings(insertSettings: InsertModelSettings): Promise<ModelSettings> {
+    const id = randomUUID();
+    const settings: ModelSettings = {
+      ...insertSettings,
+      id,
+      endpoint: insertSettings.endpoint ?? null,
+      apiKey: insertSettings.apiKey ?? null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    this.modelSettings.set(id, settings);
+    return settings;
+  }
+
+  async getModelSettings(id: string): Promise<ModelSettings | undefined> {
+    return this.modelSettings.get(id);
+  }
+
+  async getAllModelSettings(): Promise<ModelSettings[]> {
+    return Array.from(this.modelSettings.values())
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+  }
+
+  async getDefaultModelSettings(): Promise<ModelSettings | undefined> {
+    return Array.from(this.modelSettings.values())
+      .find(settings => settings.isDefault === "true");
+  }
+
+  async updateModelSettings(id: string, updates: Partial<ModelSettings>): Promise<ModelSettings | undefined> {
+    const settings = this.modelSettings.get(id);
+    if (!settings) return undefined;
+    
+    const updatedSettings = { ...settings, ...updates, updatedAt: new Date() };
+    this.modelSettings.set(id, updatedSettings);
+    return updatedSettings;
+  }
+
+  async deleteModelSettings(id: string): Promise<void> {
+    this.modelSettings.delete(id);
   }
 }
 

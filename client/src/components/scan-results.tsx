@@ -208,7 +208,7 @@ export default function ScanResults({ scanId }: ScanResultsProps) {
       </Card>
 
       {/* Issues List */}
-      <IssueList issues={issues} />
+      <IssueList issues={issues} scanId={scanId} />
     </div>
   );
 }
