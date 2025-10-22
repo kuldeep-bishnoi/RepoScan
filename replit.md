@@ -36,7 +36,9 @@ Preferred communication style: Simple, everyday language.
 ### Database Schema
 - **Scans Table**: Stores scan metadata including repository URL, status, progress, and scan options
 - **Issues Table**: Stores individual security findings with severity levels, file locations, and remediation guidance
-- **Relationships**: Foreign key relationship between scans and their associated issues
+- **Remediations Table**: Tracks automated remediation attempts with status, original/remediated code diffs, LLM model used, PR URLs, and attempt counts
+- **Settings Table**: Stores user configuration for LLM providers, endpoints, API keys, and preferences
+- **Relationships**: Foreign key relationships between scans→issues and issues→remediations
 
 ### Security Scanning Engine
 - **Multi-Tool Integration**: Comprehensive security scanning with 8 different tools:
@@ -78,6 +80,10 @@ Preferred communication style: Simple, everyday language.
 - **GET /api/scans**: Retrieve all scans
 - **GET /api/scans/:id**: Get specific scan with associated issues
 - **POST /api/scans**: Create new security scan with repository URL and options
+- **POST /api/scans/:scanId/issues/:issueId/remediate**: Generate AI-powered fix for a specific issue
+- **POST /api/scans/:scanId/issues/:issueId/create-pr**: Create GitHub pull request with remediated code
+- **GET /api/settings**: Retrieve current LLM and GitHub settings
+- **POST /api/settings**: Update LLM provider and configuration settings
 - **Real-time Progress**: Polling-based progress tracking during scan execution
 
 ### Authentication & Authorization
@@ -100,3 +106,41 @@ Preferred communication style: Simple, everyday language.
 - **Error Handling**: Enhanced error handling to prevent information leakage in error messages
 - **Semgrep Compliance**: Resolved all medium-severity path traversal warnings identified by Semgrep static analysis
 - **Defense in Depth**: Implemented multi-layer security validation including character filtering, path normalization, and boundary checking
+
+### Automated Remediation Features (October 22, 2025)
+SecureScan now includes intelligent automated remediation capabilities that use AI to suggest and apply fixes for detected security issues:
+
+#### LLM Integration Service
+- **Multi-Provider Support**: Configurable LLM providers including Ollama (for local models like Llama), OpenAI, Anthropic, and custom endpoints
+- **Flexible Configuration**: Settings page allows users to configure model endpoints, API keys, and select preferred providers
+- **Robust Error Handling**: Comprehensive error handling with fallback mechanisms and detailed error messages
+- **Type Safety**: Strongly typed responses with Zod schema validation
+
+#### Automated Remediation System
+- **Intelligent Fix Generation**: Uses LLM models to analyze security issues and generate context-aware code fixes
+- **Code Preservation**: Ensures fixes maintain code functionality while addressing security concerns
+- **Diff Preview**: Side-by-side diff viewer showing original code vs. proposed fixes before applying
+- **Tracking System**: Database schema tracks remediation attempts, status, and metadata
+- **Multi-Attempt Support**: Tracks multiple remediation attempts per issue with success/failure status
+
+#### GitHub PR Integration
+- **Automated PR Creation**: Creates pull requests directly from remediation fixes with detailed descriptions
+- **Security Hardening**: Uses `simple-git` library to prevent command injection vulnerabilities
+- **Branch Naming**: Automatic branch naming with severity level and issue ID
+- **Commit Messages**: Well-formatted commit messages including issue title and description
+- **OAuth Integration**: Leverages Replit's GitHub connector for secure authentication
+- **Path Validation**: Comprehensive file path sanitization to prevent path traversal attacks
+
+#### User Interface Enhancements
+- **Issue Actions**: Each detected issue includes "Remediate" and "Create PR" action buttons
+- **Visual Feedback**: Loading states, success/error messages, and progress indicators
+- **Diff Viewer Component**: Syntax-highlighted side-by-side comparison of code changes
+- **Settings Management**: Dedicated settings page for configuring LLM endpoints and GitHub integration
+- **Real-time Updates**: Automatic cache invalidation and UI updates after remediation actions
+
+#### Security Considerations
+- **Input Sanitization**: All file paths and branch names are sanitized before use
+- **No Shell Injection**: Replaced unsafe `exec()` calls with type-safe library methods
+- **API Key Protection**: Secure storage of API keys and tokens using Replit's secret management
+- **Path Traversal Prevention**: Validates all file paths to ensure they stay within repository boundaries
+- **Rate Limiting Ready**: Infrastructure supports rate limiting for LLM API calls

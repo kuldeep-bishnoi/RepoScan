@@ -14,39 +14,35 @@ function Nav() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           <div className="flex items-center">
-            <Link href="/">
-              <span className="flex items-center cursor-pointer">
-                <i className="fas fa-shield-alt text-brand-500 text-2xl mr-3"></i>
-                <span className="text-xl font-bold text-slate-900">SecureScan</span>
-              </span>
+            <Link href="/" className="flex items-center no-underline">
+              <i className="fas fa-shield-alt text-brand-500 text-2xl mr-3"></i>
+              <span className="text-xl font-bold text-slate-900">SecureScan</span>
             </Link>
           </div>
           <div className="flex items-center space-x-4">
-            <Link href="/">
-              <span 
-                className={`px-4 py-2 rounded-md text-sm font-medium cursor-pointer ${
-                  location === "/" 
-                    ? "bg-brand-50 text-brand-700" 
-                    : "text-slate-600 hover:text-slate-900"
-                }`}
-                data-testid="nav-dashboard"
-              >
-                <i className="fas fa-home mr-2"></i>
-                Dashboard
-              </span>
+            <Link 
+              href="/"
+              className={`px-4 py-2 rounded-md text-sm font-medium no-underline ${
+                location === "/" 
+                  ? "bg-brand-50 text-brand-700" 
+                  : "text-slate-600 hover:text-slate-900"
+              }`}
+              data-testid="nav-dashboard"
+            >
+              <i className="fas fa-home mr-2"></i>
+              Dashboard
             </Link>
-            <Link href="/settings">
-              <span 
-                className={`px-4 py-2 rounded-md text-sm font-medium cursor-pointer ${
-                  location === "/settings" 
-                    ? "bg-brand-50 text-brand-700" 
-                    : "text-slate-600 hover:text-slate-900"
-                }`}
-                data-testid="nav-settings"
-              >
-                <i className="fas fa-cog mr-2"></i>
-                Settings
-              </span>
+            <Link 
+              href="/settings"
+              className={`px-4 py-2 rounded-md text-sm font-medium no-underline ${
+                location === "/settings" 
+                  ? "bg-brand-50 text-brand-700" 
+                  : "text-slate-600 hover:text-slate-900"
+              }`}
+              data-testid="nav-settings"
+            >
+              <i className="fas fa-cog mr-2"></i>
+              Settings
             </Link>
           </div>
         </div>
