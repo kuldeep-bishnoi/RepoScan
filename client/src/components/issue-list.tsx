@@ -198,11 +198,19 @@ export default function IssueList({ issues }: IssueListProps) {
                   )}
                 </div>
               </div>
-              <div className="flex-shrink-0">
-                <Button variant="ghost" size="sm">
-                  <i className="fas fa-external-link-alt"></i>
-                </Button>
-              </div>
+              {issue.cve && (
+                <div className="flex-shrink-0">
+                  <Button 
+                    variant="ghost" 
+                    size="sm"
+                    onClick={() => window.open(`https://nvd.nist.gov/vuln/detail/${issue.cve}`, '_blank')}
+                    data-testid={`button-view-cve-${issue.id}`}
+                    title={`View ${issue.cve} details`}
+                  >
+                    <i className="fas fa-external-link-alt"></i>
+                  </Button>
+                </div>
+              )}
             </div>
           </div>
         ))}
